@@ -40,6 +40,12 @@ void OnDataReceived(const uint8_t *mac, const uint8_t *incomingData, int len);
 float temperature;
 float humidity;
 int soil_humidity;
+int active_time = 0;
+
+int auto_temperature = 1000;
+int auto_humidity = 1000;
+int auto_soil_humidity = 1000;
+int auto_active_time = 30;
 
 SPIClass mySpi = SPIClass(VSPI);
 XPT2046_Touchscreen ts(XPT2046_CS, XPT2046_IRQ);
@@ -51,17 +57,19 @@ int buttonHoriz = 100;
 int buttonVetic = 50;
 int fontSize = 5;
 
-std::map<String, boolean> dictLeds = {
-    {"Led 1", false},
-    {"Led 2", false},
-    {"Led 3", false}};
-String listLeds[] = {"Led 1", "Led 2", "Led 3"};
-String currentLed = listLeds[0];
+std::map<String, boolean> dictTela = {
+    {"Tela 1", false},
+    {"Tela 2", false}};
+String listTela[] = {"Tela 1", "Tela 2"};
+String currentTela = listTela[0];
 int currentIndex = 0;
+
+void loop2(void* pvParameters);
 
 void setup()
 {
   Serial.begin(115200);
+
   WiFi.mode(WIFI_MODE_STA);          // configura o WIFi para o Modo de estação WiFi
   Serial.print("Endereço MAC: ");    // A0:A3:B3:AB:5F:7C
   Serial.println(WiFi.macAddress()); // retorna o endereço MAC do dispositivo
@@ -131,36 +139,74 @@ void printTouchToDisplay(TS_Point p)
   tft.fillTriangle(240, 180, 300, 200, 240, 220, TFT_WHITE);
 
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
-  tft.drawCentreString(currentLed, x, 190, fontSize);
-  tft.drawCentreString("Central de Controle", x, 40, fontSize);
+  //tft.drawCentreString(currentTela, x, 190, fontSize);
 
-  String display_text = "Temperatura: " + String(temperature);
-  tft.drawCentreString(display_text, x, 65, fontSize);
-  String display_text = "Umidade: " + String(humidity);
-  tft.drawCentreString(display_text, x, 70, fontSize);
-  String display_text = "Umidade do solo: " + String(soil_humidity);
-  tft.drawCentreString(display_text, x, 75, fontSize);
+  if (currentTela == "Tela 1") {
+    tft.drawCentreString("Central de Controle", x, 20, fontSize);
 
-  if (dictLeds[currentLed] == false)
-  {
-    tft.fillRect(x - buttonHoriz / 2, y, buttonHoriz, buttonVetic, TFT_RED);
-    tft.setTextColor(TFT_BLACK, TFT_RED);
-    tft.drawCentreString("OFF", x, y + 15, fontSize);
+    String display_text = "Temperatura: " + String(temperature);
+    tft.drawCentreString(display_text, x, 65, fontSize -2);
+    display_text = "Umidade do Ar: " + String(humidity);
+    tft.drawCentreString(display_text, x, 90, fontSize -2);
+    display_text = "Umidade do solo: " + String(soil_humidity);
+    tft.drawCentreString(display_text, x, 115, fontSize -2);
+    display_text = "Tempo acionado: " + String(active_time);
+    tft.drawCentreString(display_text, x, 140, fontSize -2);
 
-    // struct off
-    pinData.pin_id = 1;
-    pinData.pin_on = false;
+  
+    if (dictTela[currentTela] == false)
+    {
+      tft.fillRect(x - buttonHoriz / 2, y+75, buttonHoriz, buttonVetic, TFT_RED);
+      tft.setTextColor(TFT_BLACK, TFT_RED);
+      tft.drawCentreString("OFF", x, y + 15 +75, fontSize);
+
+      // struct off
+      pinData.pin_id = 1;
+      pinData.pin_on = false;
+    }
+
+    else
+    {
+      tft.fillRect(x - buttonHoriz / 2, y+75, buttonHoriz, buttonVetic, TFT_GREEN);
+      tft.setTextColor(TFT_BLACK, TFT_GREEN);
+      tft.drawCentreString("ON", x, y + 15 +75, fontSize);
+
+      // struct on
+      pinData.pin_id = 1;
+      pinData.pin_on = true;
+    }
   }
 
-  else
-  {
-    tft.fillRect(x - buttonHoriz / 2, y, buttonHoriz, buttonVetic, TFT_GREEN);
-    tft.setTextColor(TFT_BLACK, TFT_GREEN);
-    tft.drawCentreString("ON", x, y + 15, fontSize);
+  else { //Tela 2
+    tft.drawCentreString("Acionamento", x, 180, fontSize);
+    tft.drawCentreString("Automatico", x, 210, fontSize);
 
-    // struct on
-    pinData.pin_id = 1;
-    pinData.pin_on = true;
+    tft.drawCentreString("Temperatura: ", 100, 30, fontSize -2);
+    tft.drawCentreString("Umidade: ", 100, 65, fontSize -2);
+    tft.drawCentreString("Umidade do Solo: ", 105, 100, fontSize -2);
+    tft.drawCentreString("Tempo Acionado: ", 105, 135, fontSize -2);
+
+    tft.drawCentreString(String(auto_temperature), 247, 30, fontSize -2);
+    tft.drawCentreString(String(auto_humidity), 247, 65, fontSize -2);
+    tft.drawCentreString(String(auto_soil_humidity), 247, 100, fontSize -2);
+    tft.drawCentreString(String(auto_active_time), 247, 135, fontSize -2);
+
+    // Temperatura
+    tft.fillTriangle(190, 30, 175, 40, 190, 50, TFT_WHITE);
+    tft.fillTriangle(305, 30, 320, 40, 305, 50, TFT_WHITE);
+
+    //Umidade
+    tft.fillTriangle(190, 30 +35, 175, 40 +35, 190, 50 +35, TFT_WHITE);
+    tft.fillTriangle(305, 30 +35, 320, 40 +35, 305, 50 +35, TFT_WHITE);
+
+    //Umidade do Solo
+    tft.fillTriangle(190, 30 +70, 175, 40 +70, 190, 50 +70, TFT_WHITE);
+    tft.fillTriangle(305, 30 +70, 320, 40 +70, 305, 50 +70, TFT_WHITE);
+
+    //Tempo Acionado
+    tft.fillTriangle(190, 30 +105, 175, 40 +105, 190, 50 +105, TFT_WHITE);
+    tft.fillTriangle(305, 30 +105, 320, 40 +105, 305, 50 +105, TFT_WHITE);
+    
   }
 
   esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *)&pinData, sizeof(pinData));
@@ -190,15 +236,33 @@ void printTouchToDisplay(TS_Point p)
 
 void loop()
 {
+
   if (ts.tirqTouched() && ts.touched())
   {
     TS_Point p = ts.getPoint();
     float x_tela = p.x / 12.5;       // Para o máximo ser 320
     float y_tela = p.y / 16.6666666; // Para o máximo ser 240
 
-    if (x_tela > x - buttonHoriz / 2 and x_tela < x + buttonHoriz / 2 and y_tela > y and y_tela < y + buttonVetic)
+    if (x_tela > x - buttonHoriz / 2 and x_tela < x + buttonHoriz / 2 and y_tela > y +75 and y_tela < y + buttonVetic +75)
     {
-      dictLeds[currentLed] = !dictLeds[currentLed];
+      dictTela[currentTela] = !dictTela[currentTela];
+
+      if (dictTela[currentTela]) {
+        active_time = 30;
+
+        xTaskCreatePinnedToCore (
+          loop2,     // Function to implement the task
+          "loop2",   // Name of the task
+          16000,      // Stack size in bytes
+          NULL,      // Task input parameter
+          0,         // Priority of the task
+          NULL,      // Task handle.
+          0          // Core where the task should run
+        ); 
+      }
+      else 
+        active_time = 0;
+
     }
 
     else if (x_tela > 20 and x_tela < 100 and y_tela > 180 and y_tela < 220)
@@ -206,16 +270,16 @@ void loop()
       currentIndex = currentIndex - 1;
       if (currentIndex < 0)
         currentIndex = 2;
-      currentLed = listLeds[currentIndex];
+      currentTela = listTela[currentIndex];
       delay(300);
     }
 
     else if (x_tela > 220 and x_tela < 300 and y_tela > 180 and y_tela < 220)
     {
       currentIndex = currentIndex + 1;
-      if (currentIndex > 2)
+      if (currentIndex > 1)
         currentIndex = 0;
-      currentLed = listLeds[currentIndex];
+      currentTela = listTela[currentIndex];
       delay(300);
     }
     // printTouchToSerial(p);
@@ -250,4 +314,16 @@ void OnDataReceived(const uint8_t *mac, const uint8_t *incomingData, int len)
   soil_humidity = sensorData.soil_humidity;
 
   printTouchToDisplay(p);
+}
+
+void loop2(void* pvParameters) {
+  while (1) {
+    if (active_time >= 1) {
+      delay (1000); // wait for a second
+      active_time--;
+      tft.fillRect(20, 130, 240, 30, TFT_BLACK);
+      tft.setTextColor(TFT_WHITE, TFT_WHITE);
+      tft.drawCentreString("Tempo acionado: " + String(active_time), x, 140, fontSize -2);
+    }
+  }
 }
